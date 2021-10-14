@@ -8,6 +8,7 @@ import (
 
 	"etcd/auth"
 	"etcd/kv"
+	"etcd/client"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
 )
@@ -24,7 +25,8 @@ func main() {
 	//cli.AuthEnable(context.TODO())
 	defer cli.Close() // make sure to close the client
 	//kvTest(cli)
-	authTest(cli)
+	//authTest(cli)
+	cliTest()
 }
 
 func kvTest(cli *clientv3.Client)  {
@@ -45,6 +47,11 @@ func kvTest(cli *clientv3.Client)  {
 func authTest(cli *clientv3.Client)  {
 	a := &auth.Auth{Cli: cli, TlsConfig: tlsConfig}
 	a.AuthExample()
+}
+
+func cliTest()  {
+	c := client.MyClient{TlsConfig:tlsConfig}
+	c.Client()
 }
 
 func getCli() *clientv3.Client {
