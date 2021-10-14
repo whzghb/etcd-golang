@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"etcd/lease"
 	"fmt"
 	"log"
 	"time"
@@ -26,7 +27,8 @@ func main() {
 	defer cli.Close() // make sure to close the client
 	//kvTest(cli)
 	//authTest(cli)
-	cliTest()
+	//cliTest()
+	leaseTest(cli)
 }
 
 func kvTest(cli *clientv3.Client)  {
@@ -52,6 +54,11 @@ func authTest(cli *clientv3.Client)  {
 func cliTest()  {
 	c := client.MyClient{TlsConfig:tlsConfig}
 	c.Client()
+}
+
+func leaseTest(cli *clientv3.Client)  {
+	l := lease.Lease{Cli:cli}
+	l.LeaseExample()
 }
 
 func getCli() *clientv3.Client {
