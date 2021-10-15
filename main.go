@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"etcd/election"
 	"etcd/lease"
+	"etcd/transfer"
 	"etcd/watch"
 	"fmt"
 	"log"
@@ -32,7 +33,8 @@ func main() {
 	//cliTest()
 	//leaseTest(cli)
 	//watchTest(cli)
-	electionTest(cli)
+	//electionTest(cli)
+	transferTest(cli)
 }
 
 func kvTest(cli *clientv3.Client)  {
@@ -73,6 +75,11 @@ func watchTest(cli *clientv3.Client)  {
 func electionTest(client *clientv3.Client)  {
 	e := election.Election{Cli: client}
 	e.ElectionExample()
+}
+
+func transferTest(cli *clientv3.Client)  {
+	t := transfer.Transfer{Cli:cli}
+	t.BalancesTransfer()
 }
 
 func getCli() *clientv3.Client {
