@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"etcd/election"
 	"etcd/lease"
+	"etcd/lock"
 	"etcd/transfer"
 	"etcd/watch"
 	"fmt"
@@ -34,7 +35,8 @@ func main() {
 	//leaseTest(cli)
 	//watchTest(cli)
 	//electionTest(cli)
-	transferTest(cli)
+	//transferTest(cli)
+	lockTest(cli)
 }
 
 func kvTest(cli *clientv3.Client)  {
@@ -80,6 +82,12 @@ func electionTest(client *clientv3.Client)  {
 func transferTest(cli *clientv3.Client)  {
 	t := transfer.Transfer{Cli:cli}
 	t.BalancesTransfer()
+}
+
+func lockTest(cli *clientv3.Client)  {
+	l := lock.Lock{Cli:cli}
+	//l.LockExample()
+	l.LockWithLease()
 }
 
 func getCli() *clientv3.Client {
