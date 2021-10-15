@@ -35,8 +35,10 @@ func (a *Auth)AuthExample()  {
 
 func (a *Auth)NormalUser()  {
 	a.AddUser("user1", "123")
+	a.AddUser("user2", "123")
 	a.AddRole("role1")
 	a.UserBindRole("user1", "role1")
+	a.UserBindRole("user2", "role1")
 
 	// role1权限是可以读/写key为["foo", "goo")范围内的数据，r用户与r-role绑定，所以r用户拥有这个权限
 	a.GrantPermission("role1", "foo", "goo", clientv3.PermissionType(clientv3.PermReadWrite))

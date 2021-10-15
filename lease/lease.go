@@ -107,6 +107,7 @@ func (l *Lease)keepAliveOnce()  {
 	fmt.Println(ka.TTL)
 }
 
+// 删除租约
 func (l *Lease) revoke()  {
 	resp, err := l.Cli.Grant(context.TODO(), 5)
 	if err != nil {

@@ -30,7 +30,7 @@ func (kv *KV)Put(cli *clientv3.Client)  {
 
 func (kv *KV)Get(cli *clientv3.Client, key string)  {
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	resp, err := cli.Get(ctx, key)
+	resp, err := cli.Get(ctx, key, clientv3.WithPrefix())
 	cancel()
 	if err != nil {
 		log.Fatal(err)
