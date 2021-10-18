@@ -29,29 +29,30 @@ func main() {
 	// 开启认证
 	//cli.AuthEnable(context.TODO())
 	defer cli.Close() // make sure to close the client
-	//kvTest(cli)
+	kvTest(cli)
 	//authTest(cli)
 	//cliTest()
 	//leaseTest(cli)
 	//watchTest(cli)
 	//electionTest(cli)
 	//transferTest(cli)
-	lockTest(cli)
+	//lockTest(cli)
 }
 
 func kvTest(cli *clientv3.Client)  {
 	k := &kv.KV{}
-	k.Put(cli)
-	k.Get(cli, "sample_key")
-	k.Do(cli)
-	k.Get(cli, "put-key")
-	k.Compact(cli)
-	k.Delete(cli, "sample")
-	k.GetWithRev(cli)
-	k.GetSortedPrefix(cli)
-	k.PutErrorHandling(cli)
-	//txn(cli)
+	//k.Put(cli)
+	//k.Get(cli, "sample_key")
+	//k.Do(cli)
+	//k.Get(cli, "put-key")
+	//k.Compact(cli)
+	//k.Delete(cli, "sample")
+	//k.GetWithRev(cli)
+	//k.GetSortedPrefix(cli)
+	//k.PutErrorHandling(cli)
+	////txn(cli)
 	k.ChangeKey(cli)
+	//k.LockExample(cli)
 }
 
 func authTest(cli *clientv3.Client)  {

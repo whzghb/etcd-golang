@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/coreos/etcd/clientv3"
+	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"log"
 	"time"
@@ -18,19 +20,37 @@ var (
 )
 
 func (kv *KV)Put(cli *clientv3.Client)  {
+
+	//cli.Delete(context.TODO(), "qwe")
+
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	resp, err := cli.Put(ctx, "sample_key", "sample_value")
+	resp, err := cli.Put(ctx, "qwe", "qw_value2")
 	cancel()
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println(resp)
 	fmt.Println("current revision:", resp.Header.Revision) // revision start at 1
+
+
+	resp, err = cli.Put(context.TODO(), "qwer", "qw_value2")
+	cancel()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(resp)
+	fmt.Println("current revision:", resp.Header.Revision) // revision start at 1
+
+
+	rsp, err := cli.Get(context.TODO(), "qw", clientv3.WithPrefix())
+	fmt.Println(rsp, err)
 	// current revision: 2
 }
 
 func (kv *KV)Get(cli *clientv3.Client, key string)  {
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	resp, err := cli.Get(ctx, key, clientv3.WithPrefix())
+	//resp, err := cli.Get(ctx, key, clientv3.WithPrefix())
+	resp, err := cli.Get(ctx, key)
 	cancel()
 	if err != nil {
 		log.Fatal(err)
@@ -196,31 +216,31 @@ func (kv *KV)PutErrorHandling(cli *clientv3.Client)  {
 
 // 事务
 func (kv *KV)Txn(cli *clientv3.Client) bool {
-	k, _ := cli.Get(context.TODO(), "key")
-	fmt.Println("get key", string(k.Kvs[0].Value))
-	kvc := clientv3.NewKV(cli)
 
-	_, err := kvc.Put(context.TODO(), "key", string(k.Kvs[0].Value))
-	if err != nil {
-		log.Fatal(err)
-	}
+	key := "key"
 
-	// 模拟该值已被修改
-	//_, _ = cli.Put(context.TODO(), "key", "omg")
+	k, _ := cli.Get(context.TODO(), key)
+	fmt.Println(k)
+
 	// 模拟耗时操作，等待值被其他人修改
 	time.Sleep(5*time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	txrsp, err := kvc.Txn(ctx).
-		// ETCD中的txn通过"If-Then-Else"实现了原子操作。
-		// txn value comparisons are lexical，如果开始获取到的值和现在的值一致，表示该值没有被改动，乐观锁
-		If(clientv3.Compare(clientv3.Value("key"), "=", string(k.Kvs[0].Value))).
-		// the "Then" runs
-		Then(clientv3.OpPut("key", "XYZ")).
-		// the "Else" does not run
-		// clientv3.OpPut("key", "ABC")可以做操作，也可以不做操作
-		Else().
-		Commit()
+
+	var txrsp *clientv3.TxnResponse
+	var err error
+
+	put := clientv3.OpPut(key, "XYZ")
+	if len(k.Kvs) == 0{
+		// CreateRevision是这个key创建时被分配的这个序号，当key不存在时，createRevision是0
+		cmpExists := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
+		txrsp, err = cli.Txn(ctx).If(cmpExists).Then(put).Else().Commit()
+	}else {
+		// ModRevision是修改的revision，每修改一次值加1，如果当前的revision和前面获取到的revision一致，说明没有被修改
+		cmpModVersion := clientv3.Compare(clientv3.ModRevision(key), "=", k.Kvs[0].ModRevision)
+		txrsp, err = cli.Txn(ctx).If(cmpModVersion).Then(put).Else().Commit()
+	}
+
 	cancel()
 	if err != nil {
 		log.Fatal(err)
@@ -229,7 +249,7 @@ func (kv *KV)Txn(cli *clientv3.Client) bool {
 	fmt.Println(txrsp.Succeeded)
 
 	// 模拟值被修改后此处为omg，否则为XYZ
-	kv.Get(cli, "key")
+	kv.Get(cli, key)
 	return txrsp.Succeeded
 }
 
@@ -248,6 +268,105 @@ func (kv *KV)ChangeKey(cli *clientv3.Client)  {
 		}
 		// 否则一秒后重新尝试
 		time.Sleep(1*time.Second)
+	}
+}
+
+func (k *KV)LockExample(cli *clientv3.Client)  {
+	go k.LockT(cli)
+	time.Sleep(1*time.Second)
+	go k.LockT(cli)
+	time.Sleep(1*time.Second)
+	k.LockT(cli)
+}
+
+func (k *KV)LockT(cli *clientv3.Client)  {
+	pfx:="mylock"
+	lease, err  := cli.Grant(context.Background(), 10)
+	if err != nil{
+		return
+	}
+	myKey := fmt.Sprintf("%s%d", pfx, lease.ID)
+	cmp := clientv3.Compare(clientv3.CreateRevision(myKey), "=", 0)
+	// put self in lock waiters via myKey; oldest waiter holds lock
+	put := clientv3.OpPut(myKey, "", clientv3.WithLease(lease.ID))
+	// reuse key in case this session already holds the lock
+	get := clientv3.OpGet(myKey)
+	// fetch current holder to complete uncontended path with only one RPC
+	getOwner := clientv3.OpGet(pfx, clientv3.WithFirstCreate()...)
+	resp, err := cli.Txn(context.TODO()).If(cmp).Then(put, getOwner).Else(get, getOwner).Commit()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(resp.Succeeded)
+	myRev := resp.Header.Revision
+	if !resp.Succeeded {
+		myRev = resp.Responses[0].GetResponseRange().Kvs[0].CreateRevision
+	}
+	fmt.Println("myrev, header", myRev, resp.Header.Revision)
+
+	// if no key on prefix / the minimum rev is key, already hold the lock
+	ownerKey := resp.Responses[1].GetResponseRange().Kvs
+	fmt.Println(ownerKey)
+	if len(ownerKey) == 0 || ownerKey[0].CreateRevision == myRev {
+		hdr := resp.Header
+		fmt.Println("---------", hdr)
+		return
+	}
+	// wait for deletion revisions prior to myKey
+	go func() {
+		cli.Put(context.TODO(), "a", "b")
+	}()
+	hdr, werr := waitDeletes(context.TODO(), cli, pfx, myRev-1)
+	// release lock key if wait failed
+	if werr != nil {
+		cli.Delete(context.TODO(), myKey)
+	} else {
+		hdr = hdr
+		fmt.Println(hdr)
+	}
+}
+
+func waitDelete(ctx context.Context, client *clientv3.Client, key string, rev int64) error {
+	fmt.Println("wait delete rev", rev)
+	cctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var wr clientv3.WatchResponse
+	wch := client.Watch(cctx, key, clientv3.WithRev(rev))
+	for wr = range wch {
+		for _, ev := range wr.Events {
+			if ev.Type == mvccpb.DELETE {
+				fmt.Println("deleted")
+				return nil
+			}
+		}
+	}
+	if err := wr.Err(); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return fmt.Errorf("lost watcher waiting for delete")
+}
+
+// waitDeletes efficiently waits until all keys matching the prefix and no greater
+// than the create revision.
+func waitDeletes(ctx context.Context, client *clientv3.Client, pfx string, maxCreateRev int64) (*pb.ResponseHeader, error) {
+	getOpts := append(clientv3.WithLastCreate(), clientv3.WithMaxCreateRev(maxCreateRev))
+	for {
+		resp, err := client.Get(ctx, pfx, getOpts...)
+		fmt.Println("get resp", resp)
+		if err != nil {
+			return nil, err
+		}
+		if len(resp.Kvs) == 0 {
+			return resp.Header, nil
+		}
+		lastKey := string(resp.Kvs[0].Key)
+		if err = waitDelete(ctx, client, lastKey, resp.Header.Revision); err != nil {
+			return nil, err
+		}
 	}
 }
 
