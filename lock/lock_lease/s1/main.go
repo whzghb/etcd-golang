@@ -7,10 +7,10 @@ import (
 	"log"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/pkg/transport"
-	"github.com/coreos/etcd/clientv3/concurrency"
 	"context"
+	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/clientv3/concurrency"
+	"github.com/coreos/etcd/pkg/transport"
 )
 
 var (
@@ -35,7 +35,7 @@ func main() {
 func lockTest(cli *clientv3.Client)  {
 	l := Lock{Cli:cli}
 	//l.LockExample()
-	l.LockKey(1, 10)
+	l.LockKey(1, 50)
 }
 
 func (l *Lock)LockExample()  {
@@ -71,7 +71,6 @@ func (l *Lock)LockKey(id int, ttl int64)  {
 	//不能用close, close将不会等待租期到期即会被其他程序获取到锁
 	//defer s.Close()
 	//Orphan会在租期到期时释放锁
-	//如果既没有close,也没有orphan，那么锁将会在主程序(main函数)结束后释放，也就是如果程序崩溃而退出并不会一直占用锁
 	defer s.Orphan()
 	m := concurrency.NewMutex(s, "leaseLock2")
 	// acquire lock for s1
@@ -82,6 +81,7 @@ func (l *Lock)LockKey(id int, ttl int64)  {
 	fmt.Printf("acquired lock for s%d\n", id)
 	end := time.Now().Unix()
 	fmt.Printf("wait time %d\n", end-now)
+
 }
 
 func getCli() *clientv3.Client {

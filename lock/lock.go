@@ -102,4 +102,5 @@ func (l *Lock)LockKey(id int, ttl int64)  {
 	end := time.Now().Unix()
 	fmt.Printf("---------- %d\n", end-now)
 	//time.Sleep(10*time.Second)
+
 }

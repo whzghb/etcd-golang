@@ -34,7 +34,7 @@ func main() {
 
 func lockTest(cli *clientv3.Client)  {
 	l := Lock{Cli:cli}
-	l.LockKey(2, 10)
+	l.LockKey(2, 50)
 	//l.LockExample()
 }
 
